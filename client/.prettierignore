@@ -1,6 +1,0 @@
-public/locales
-dist
-dev-dist
-node_modules
-.vscode
-.vite

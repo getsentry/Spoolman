@@ -45,11 +45,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install node
-        uses: actions/setup-node@v4.0.3
-        with:
-          node-version: '24'
-
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -62,26 +57,13 @@ jobs:
 
       - name: Install lefthook
         run: uv add --dev lefthook
-      
-      - name: Install client dependencies
-        run: |
-          cd client
-          npm ci
-
-      # lefthook's `ci` hook lints/formats/type-checks client_v2 too, via
-      # hardcoded ./node_modules/.bin/* paths, so its deps must be present.
-      - name: Install client_v2 dependencies
-        run: |
-          cd client_v2
-          npm ci
 
       - name: Run pre-commit
         run: uv run lefthook run ci
   #
-  # Build the Spoolman client for baking into the docker images
-  # This is done on native hardware to speed things up, vite is very slow on emulated hardware
+  # Package the Spoolman source for the release zip
   #
-  build-client:
+  package:
     # Same-repo branches already got a full run from the push trigger, so skip the
     # duplicate pull_request run. Bot branches excluded above still need it, as do
     # forks, whose pushes fire no event here. Skipping the three jobs with no `needs`
@@ -92,11 +74,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install node
-        uses: actions/setup-node@v4.0.3
-        with:
-          node-version: '24'
-
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -106,64 +83,20 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version-file: "pyproject.toml"
-    
-      - name: Install client dependencies
-        run: |
-          cd client
-          npm ci
-
-      - name: Build
-        run: |
-          cd client
-          rm -f .env && echo "VITE_APIURL=/api/v1" > .env.production
-          npm run build
-
-      # Build the new Svelte client (client_v2), served by default at runtime.
-      # No VITE_APIURL is set: the client resolves the API relative to its base path.
-      - name: Install client_v2 dependencies
-        run: |
-          cd client_v2
-          npm ci
-
-      - name: Build client_v2
-        run: |
-          cd client_v2
-          npm run build
 
       - name: Write build info
         run: |
           echo "GIT_COMMIT=$(git rev-parse --short HEAD)" > build.txt
           echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> build.txt
 
-      # Remove client sources and keep only the built output for each client
       - name: Clean
         run: |
-          mv client/dist dist
-          rm -rf client
-          mkdir client
-          mv dist client/dist
-          mv client_v2/build build_v2
-          rm -rf client_v2
-          mkdir client_v2
-          mv build_v2 client_v2/build
           rm -rf .git
           rm -rf .venv
 
       - name: Fix permissions
         run: |
           chmod +x scripts/*.sh
-
-      - name: Upload client Spoolman artifact
-        uses: actions/upload-artifact@v4.4.0
-        with:
-          name: client
-          path: client/dist
-
-      - name: Upload client_v2 Spoolman artifact
-        uses: actions/upload-artifact@v4.4.0
-        with:
-          name: client_v2
-          path: client_v2/build
 
       - name: Upload full Spoolman artifact
         uses: actions/upload-artifact@v4.4.0
@@ -175,25 +108,13 @@ jobs:
   # Build native image for integration tests
   #
   build-amd64:
-    needs: [build-client]
+    needs: [package]
     runs-on: ubuntu-latest
     permissions:
       packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
-      - name: Download client
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: client
-          path: client/dist
-
-      - name: Download client_v2
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: client_v2
-          path: client_v2/build
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3.6.1
@@ -312,151 +233,19 @@ jobs:
           up-flags: "--abort-on-container-exit"
           down-flags: "--volumes"
   #
-  # Perform frontend (browser) integration tests against the real image
-  #
-  test-frontend:
-    needs: [build-amd64]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Download built image
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: spoolman-image
-          path: /tmp/spoolman-image
-
-      - name: Load built image
-        run: docker load --input /tmp/spoolman-image/spoolman.tar
-
-      - name: Install node
-        uses: actions/setup-node@v4.0.3
-        with:
-          node-version: '24'
-
-      - name: Install Playwright
-        run: |
-          cd tests_frontend
-          npm ci
-          npx playwright install --with-deps chromium
-
-      - name: Start Spoolman
-        run: docker compose -f tests_frontend/docker-compose.yml up -d --wait
-
-      - name: Run frontend integration tests
-        run: |
-          cd tests_frontend
-          npx playwright test
-
-      - name: Dump Spoolman logs on failure
-        if: failure()
-        run: docker compose -f tests_frontend/docker-compose.yml logs spoolman
-
-      - name: Upload Playwright report
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4.4.0
-        with:
-          name: playwright-report
-          path: tests_frontend/playwright-report
-          retention-days: 7
-
-      - name: Stop Spoolman
-        if: always()
-        run: docker compose -f tests_frontend/docker-compose.yml down -v
-  #
-  # Perform frontend (browser) integration tests for client_v2 against the real image
-  #
-  test-frontend-v2:
-    needs: [build-amd64]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      # Argos authenticates via OIDC; fork PRs get no id-token and fall back to tokenless upload.
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Download built image
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: spoolman-image
-          path: /tmp/spoolman-image
-
-      - name: Load built image
-        run: docker load --input /tmp/spoolman-image/spoolman.tar
-
-      - name: Install node
-        uses: actions/setup-node@v4.0.3
-        with:
-          node-version: '24'
-
-      - name: Install Playwright
-        run: |
-          cd tests_frontend_v2
-          npm ci
-          npx playwright install --with-deps chromium
-
-      - name: Start Spoolman
-        run: docker compose -f tests_frontend_v2/docker-compose.yml up -d --wait
-
-      # Screenshots first: they seed a fixed dataset and need the database empty.
-      # The Argos reporter uploads them and posts the visual diff on the PR.
-      - name: Take client_v2 screenshots
-        env:
-          ARGOS_UPLOAD: "1"
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd tests_frontend_v2
-          npx playwright test --project screenshots
-
-      - name: Run client_v2 frontend integration tests
-        run: |
-          cd tests_frontend_v2
-          npx playwright test --project chromium
-
-      - name: Dump Spoolman logs on failure
-        if: failure()
-        run: docker compose -f tests_frontend_v2/docker-compose.yml logs spoolman
-
-      - name: Upload Playwright report
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4.4.0
-        with:
-          name: playwright-report-v2
-          path: tests_frontend_v2/playwright-report
-          retention-days: 7
-
-      - name: Stop Spoolman
-        if: always()
-        run: docker compose -f tests_frontend_v2/docker-compose.yml down -v
-  #
   # Build arm64 image
   # Also exported to a tar so test-multiarch-smoke can boot it under QEMU.
   # On pull requests we can't push to buildcache (forks don't have registry
   # write access), so cache-to is skipped and we only read from it.
   #
   build-arm64:
-    needs: [build-client]
+    needs: [package]
     runs-on: ubuntu-latest
     permissions:
       packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
-      - name: Download client
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: client
-          path: client/dist
-
-      - name: Download client_v2
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: client_v2
-          path: client_v2/build
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.2.0
@@ -505,25 +294,13 @@ jobs:
   # write access), so cache-to is skipped and we only read from it.
   #
   build-armv7:
-    needs: [build-client]
+    needs: [package]
     runs-on: ubuntu-latest
     permissions:
       packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
-      - name: Download client
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: client
-          path: client/dist
-
-      - name: Download client_v2
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: client_v2
-          path: client_v2/build
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.2.0
@@ -656,14 +433,12 @@ jobs:
     needs:
       [
         test,
-        test-frontend,
-        test-frontend-v2,
         test-multiarch-smoke,
         build-amd64,
         build-arm64,
         build-armv7,
         style,
-        build-client,
+        package,
       ]
     runs-on: ubuntu-latest
     permissions:
@@ -673,18 +448,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
-      - name: Download client
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: client
-          path: client/dist
-
-      - name: Download client_v2
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: client_v2
-          path: client_v2/build
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.2.0

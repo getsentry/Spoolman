@@ -334,8 +334,8 @@ def is_automatic_backup_enabled() -> bool:
 
 
 def is_update_check_enabled() -> bool:
-    """Get whether Spoolman should check GitHub for newer releases. Defaults to True."""
-    update_check = os.getenv("SPOOLMAN_UPDATE_CHECK", "TRUE").upper()
+    """Get whether Spoolman should check GitHub for newer releases. Defaults to False."""
+    update_check = os.getenv("SPOOLMAN_UPDATE_CHECK", "FALSE").upper()
     if update_check in {"FALSE", "0"}:
         return False
     if update_check in {"TRUE", "1"}:

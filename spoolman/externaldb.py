@@ -124,8 +124,11 @@ class ExternalMaterialsFile(RootModel):
 
 
 def get_external_db_url() -> str:
-    """Get the external database URL from environment variables. Defaults to DEFAULT_EXTERNAL_DB_URL."""
-    return os.getenv("EXTERNAL_DB_URL", DEFAULT_EXTERNAL_DB_URL)
+    """Get the external database URL from environment variables. Empty, so no sync, by default.
+
+    Set it to DEFAULT_EXTERNAL_DB_URL for the community SpoolmanDB.
+    """
+    return os.getenv("EXTERNAL_DB_URL", "")
 
 
 def get_external_db_name() -> str:

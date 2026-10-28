@@ -2,6 +2,7 @@
 
 import logging
 import subprocess
+import sys
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
@@ -91,29 +92,26 @@ def get_configjs() -> Response:
     return Response(content=render_config_js(base_path), media_type="text/javascript")
 
 
-# Mount the client side app. The new Svelte client is served by default; set
-# SPOOLMAN_LEGACY_CLIENT to fall back to the old React client.
+# Mount the client side app if one has been built, otherwise serve the API only. The new
+# Svelte client is served by default; set SPOOLMAN_LEGACY_CLIENT to fall back to the old
+# React client.
 if env.is_legacy_client_enabled():
-    logger.info("Serving the legacy (React) client.")
+    client_dir, fallback_document, rewrite_asset_paths = "client/dist", "index.html", True
+else:
+    client_dir, fallback_document, rewrite_asset_paths = "client_v2/build", "200.html", False
+if Path(client_dir).is_dir():
+    logger.info("Serving the web client from %s.", client_dir)
     app.mount(
         base_path,
         app=SinglePageApplication(
-            directory="client/dist",
+            directory=client_dir,
             base_path=env.get_base_path(),
-            fallback_document="index.html",
-            rewrite_asset_paths=True,
+            fallback_document=fallback_document,
+            rewrite_asset_paths=rewrite_asset_paths,
         ),
     )
 else:
-    app.mount(
-        base_path,
-        app=SinglePageApplication(
-            directory="client_v2/build",
-            base_path=env.get_base_path(),
-            fallback_document="200.html",
-            rewrite_asset_paths=False,
-        ),
-    )
+    logger.info("No web client found at %s, serving the API only.", client_dir)
 
 
 def add_trusted_origin_middleware() -> None:
@@ -231,7 +229,7 @@ async def startup() -> None:
     # There is some issue with the uvicorn worker that causes the process to hang when running alembic directly.
     # See: https://github.com/sqlalchemy/alembic/discussions/1155
     project_root = Path(__file__).parent.parent
-    subprocess.run(["alembic", "upgrade", "head"], check=True, cwd=project_root)  # noqa: ASYNC221, S607
+    subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True, cwd=project_root)  # noqa: ASYNC221
 
     # Setup scheduler
     schedule = Scheduler()
