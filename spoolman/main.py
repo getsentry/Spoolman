@@ -1,11 +1,13 @@
 """Main entrypoint to the server."""
 
 import logging
+import os
 import subprocess
 import sys
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
+import sentry_sdk
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +21,14 @@ from spoolman.api.v1.router import app as v1_app
 from spoolman.client import SinglePageApplication, render_config_js
 from spoolman.database import database
 from spoolman.prometheus.metrics import registry
+
+# Report errors and traces to Sentry. The SDK stays disabled until SENTRY_DSN is set.
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),
+    environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
+    traces_sample_rate=1.0,
+    send_default_pii=True,
+)
 
 # Define a console logger
 console_handler = logging.StreamHandler()

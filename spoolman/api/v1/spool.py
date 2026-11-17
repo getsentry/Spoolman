@@ -730,7 +730,7 @@ async def get(
     db: Annotated[AsyncSession, Depends(get_db_session)],
     spool_id: int,
 ) -> Spool:
-    db_item = await spool.get_by_id(db, spool_id)
+    db_item = spool.get_by_id(db, spool_id)
     return Spool.from_db(db_item)
 
 
