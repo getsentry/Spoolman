@@ -35,6 +35,7 @@ pydantic==2.14.0
 pydantic-core==2.50.0
 pymysql==1.2.3
 scheduler==0.8.11
+sentry-sdk==2.75.0
 setuptools==83.0.0
 sqlalchemy==2.0.54
 sqlalchemy-cockroachdb==2.0.4
@@ -43,6 +44,7 @@ tomli==2.5.0 ; python_full_version < '3.11'
 typeguard==4.6.0
 typing-extensions==4.16.0
 typing-inspection==0.4.4
+urllib3==2.8.0
 uvicorn==0.54.0
 uvloop==0.23.0 ; platform_machine != 'armv7l' and platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'
 websockets==15.0.1
