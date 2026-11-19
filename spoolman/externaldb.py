@@ -1,6 +1,5 @@
 """Functions for syncing data from an external database of manufacturers, filaments, materials, etc."""
 
-import datetime
 import logging
 import os
 from collections.abc import Iterator
@@ -10,7 +9,6 @@ from urllib.parse import urljoin
 
 import hishel
 from pydantic import BaseModel, Field, RootModel
-from scheduler.asyncio.scheduler import Scheduler
 
 from spoolman import filecache
 from spoolman.env import get_cache_dir
@@ -241,26 +239,3 @@ async def _sync() -> None:
         len(filaments.root),
         len(materials.root),
     )
-
-
-def schedule_tasks(scheduler: Scheduler) -> None:
-    """Schedule tasks to be executed by the provided scheduler.
-
-    Args:
-        scheduler: The scheduler to use for scheduling tasks.
-
-    """
-    if len(get_external_db_url().strip()) == 0:
-        logger.info("External DB URL is empty. Skipping sync.")
-        return
-
-    logger.info("Scheduling external DB sync.")
-
-    # Run once on startup
-    scheduler.once(datetime.timedelta(seconds=0), _sync)  # type: ignore[arg-type]
-
-    sync_interval = get_external_db_sync_interval()
-    if sync_interval > 0:
-        scheduler.cyclic(datetime.timedelta(seconds=sync_interval), _sync)  # type: ignore[arg-type]
-    else:
-        logger.info("Sync interval is 0, skipping periodic sync of external db.")

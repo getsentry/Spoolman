@@ -12,9 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import PlainTextResponse, RedirectResponse, Response
 from prometheus_client import generate_latest
-from scheduler.asyncio.scheduler import Scheduler
 
-from spoolman import env, externaldb, security, update_check
+from spoolman import env, security
 from spoolman.api.v1.router import app as v1_app
 from spoolman.client import SinglePageApplication, render_config_js
 from spoolman.database import database
@@ -230,12 +229,6 @@ async def startup() -> None:
     # See: https://github.com/sqlalchemy/alembic/discussions/1155
     project_root = Path(__file__).parent.parent
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True, cwd=project_root)  # noqa: ASYNC221
-
-    # Setup scheduler
-    schedule = Scheduler()
-    database.schedule_tasks(schedule)
-    externaldb.schedule_tasks(schedule)
-    update_check.schedule_tasks(schedule)
 
     logger.info("Startup complete.")
 

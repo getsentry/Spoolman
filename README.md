@@ -39,3 +39,13 @@ Spoolman is developed and maintained in my spare time. If it is useful to you, c
 <a href="https://github.com/sponsors/Donkie">
   <img alt="The people currently sponsoring Spoolman" src=".github/media/sponsors.svg">
 </a>
+
+## Background jobs
+
+Metrics, backups, the external DB sync, the update check and a weekly vacuum run as Celery beat jobs (`spoolman/worker.py`). Run a worker with beat next to the API:
+
+```bash
+celery -A spoolman.worker worker --beat --loglevel=info
+```
+
+It needs Redis, or another broker set in `SPOOLMAN_CELERY_BROKER_URL`.

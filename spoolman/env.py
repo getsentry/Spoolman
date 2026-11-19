@@ -573,3 +573,8 @@ def is_legacy_client_enabled() -> bool:
     raise ValueError(
         f"Failed to parse SPOOLMAN_LEGACY_CLIENT variable: Unknown value '{legacy_client}'.",
     )
+
+
+def get_celery_broker_url() -> str:
+    """Get the Celery broker URL from SPOOLMAN_CELERY_BROKER_URL. Defaults to a local Redis."""
+    return os.getenv("SPOOLMAN_CELERY_BROKER_URL", "redis://localhost:6379/0")

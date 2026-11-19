@@ -1,7 +1,6 @@
 """SQLAlchemy database setup."""
 
 import asyncio
-import datetime
 import filecmp
 import logging
 import shutil
@@ -14,7 +13,6 @@ from os import PathLike
 from pathlib import Path
 from typing import NamedTuple
 
-from scheduler.asyncio.scheduler import Scheduler
 from sqlalchemy import URL, event
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
@@ -296,34 +294,6 @@ async def _metrics() -> None:
         await filament_metrics(session)
         await spool_metrics(session)
     logger.debug("End metrics collection")
-
-
-def schedule_tasks(scheduler: Scheduler) -> None:
-    """Schedule tasks to be executed by the provided scheduler.
-
-    Args:
-        scheduler: The scheduler to use for scheduling tasks.
-
-    """
-    if __db is None:
-        raise RuntimeError("DB is not setup.")
-    if env.is_metrics_enabled():
-        # /metrics is unauthenticated like the rest of the API, but unlike the rest of it this is
-        # opt-in, so the operator is here on purpose and can be told what they just published.
-        logger.warning(
-            "Metrics are enabled, so /metrics serves your vendor and filament names, colors and "
-            "per-spool prices to anyone who can reach it, with no authentication. Keep it off the "
-            "public internet, or put it behind your reverse proxy's authentication.",
-        )
-        logger.info("Scheduling automatic metric collection.")
-        # Run every minute, may be needs specify timer
-        scheduler.minutely(datetime.time(second=0), _metrics)  # type: ignore[arg-type]
-    if not env.is_automatic_backup_enabled():
-        return
-    if "sqlite" in __db.connection_url.drivername:
-        logger.info("Scheduling automatic database backup for midnight.")
-        # Schedule for midnight
-        scheduler.daily(datetime.time(hour=0, minute=0, second=0), _backup_task)  # type: ignore[arg-type]
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
