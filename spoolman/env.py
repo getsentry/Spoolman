@@ -573,3 +573,8 @@ def is_legacy_client_enabled() -> bool:
     raise ValueError(
         f"Failed to parse SPOOLMAN_LEGACY_CLIENT variable: Unknown value '{legacy_client}'.",
     )
+
+
+def get_redis_url() -> str:
+    """Get the Redis URL for the job queue from SPOOLMAN_REDIS_URL. Defaults to a local Redis."""
+    return os.getenv("SPOOLMAN_REDIS_URL", "redis://localhost:6379/0")

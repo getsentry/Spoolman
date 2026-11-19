@@ -39,3 +39,13 @@ Spoolman is developed and maintained in my spare time. If it is useful to you, c
 <a href="https://github.com/sponsors/Donkie">
   <img alt="The people currently sponsoring Spoolman" src=".github/media/sponsors.svg">
 </a>
+
+## Background jobs
+
+Metrics, backups, the external DB sync, the update check and a weekly vacuum run as arq cron jobs (`spoolman/worker.py`). Run the worker next to the API:
+
+```bash
+arq spoolman.worker.WorkerSettings
+```
+
+It needs Redis, set in `SPOOLMAN_REDIS_URL`.

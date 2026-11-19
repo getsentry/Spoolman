@@ -4,7 +4,6 @@ import datetime
 import logging
 
 import httpx
-from scheduler.asyncio.scheduler import Scheduler
 
 from spoolman import env
 
@@ -56,12 +55,3 @@ async def _check() -> None:
             version,
             env.get_version(),
         )
-
-
-def schedule_tasks(scheduler: Scheduler) -> None:
-    """Schedule the update check: once in the background at startup, then periodically."""
-    if not env.is_update_check_enabled():
-        logger.info("Update check disabled.")
-        return
-    scheduler.once(datetime.timedelta(seconds=0), _check)  # type: ignore[arg-type]
-    scheduler.cyclic(CHECK_INTERVAL, _check)  # type: ignore[arg-type]
