@@ -6,6 +6,7 @@ import sys
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
+import sentry_sdk
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +20,12 @@ from spoolman.api.v1.router import app as v1_app
 from spoolman.client import SinglePageApplication, render_config_js
 from spoolman.database import database
 from spoolman.prometheus.metrics import registry
+
+# Report errors to Sentry.
+sentry_sdk.init(
+    dsn="https://e9a4b7c1d2f34861a90b2c3d4e5f6071@o1428573.ingest.us.sentry.io/4508234917680044",
+    send_default_pii=True,
+)
 
 # Define a console logger
 console_handler = logging.StreamHandler()
